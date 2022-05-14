@@ -27,17 +27,17 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 class EmployeeController {
 
     private EmployeeRepository repository;
+    private EmployeeModelAssembler assembler;
 
-    public EmployeeController(EmployeeRepository repository) {
+    public EmployeeController(EmployeeRepository repository, EmployeeModelAssembler assembler) {
         this.repository = repository;
+        this.assembler = assembler;
     }
 
     @GetMapping("/employees")
     CollectionModel<EntityModel<Employee>> readEmployees() {
         List<EntityModel<Employee>> employees = repository.findAll().stream()
-                .map(employee -> EntityModel.of(employee,
-                linkTo(methodOn(EmployeeController.class).readEmployee(employee.getId())).withSelfRel(),
-                linkTo(methodOn(EmployeeController.class).readEmployees()).withRel("employees")))
+                .map(assembler::toModel)
                 .collect(Collectors.toList());
 
         return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).readEmployees()).withSelfRel());
@@ -48,18 +48,12 @@ class EmployeeController {
         Employee employee = repository.findById(id)
                 .orElseThrow(() -> new EmployeeNotFoundException(id));
 
-        return EntityModel.of(employee,
-                linkTo(methodOn(EmployeeController.class).readEmployee(id)).withSelfRel(),
-                linkTo(methodOn(EmployeeController.class).readEmployees()).withRel("employees"));
+        return assembler.toModel(employee);
     }
 
     @PostMapping("/employees")
     EntityModel<Employee> createEmployee(@RequestBody Employee newEmployee) {
-        Employee employee = repository.save(newEmployee);
-
-        return EntityModel.of(employee,
-                linkTo(methodOn(EmployeeController.class).readEmployee(employee.getId())).withSelfRel(),
-                linkTo(methodOn(EmployeeController.class).readEmployees()).withRel("employees"));
+        return assembler.toModel(repository.save(newEmployee));
     }
 
     @PutMapping("/employees/{id}")
@@ -72,9 +66,7 @@ class EmployeeController {
                 })
                 .orElseGet(() -> repository.save(newEmployee));
 
-        return EntityModel.of(updatedEmployee,
-                linkTo(methodOn(EmployeeController.class).readEmployee(updatedEmployee.getId())).withSelfRel(),
-                linkTo(methodOn(EmployeeController.class).readEmployees()).withRel("employees"));
+        return assembler.toModel(updatedEmployee);
     }
 
     @DeleteMapping("/employees/{id}")
